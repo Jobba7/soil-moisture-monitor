@@ -22,6 +22,7 @@ DEFAULT_MAX_MOISTURE = 800
 CONFIG_FILE = "config.yml"
 
 # Configure logging with loguru
+logger.remove()
 logger.add("sensor.log", rotation="1 MB", retention="7 days", level="INFO")
 
 
