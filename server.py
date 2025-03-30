@@ -1,66 +1,79 @@
 from flask import Flask, render_template_string
+from flask_socketio import SocketIO
 import time
 import threading
 import board
 import busio
 from adafruit_seesaw.seesaw import Seesaw
 
+# Flask-Anwendung mit WebSocket-Unterstützung initialisieren
 app = Flask(__name__)
-
-# Globale Variable zum Speichern der Sensordaten
-sensor_data = {"moisture": None, "temperature": None, "timestamp": None}
+socketio = SocketIO(app, cors_allowed_origins="*")
 
 # I²C-Bus und Sensor initialisieren (Standardadresse 0x36)
 i2c_bus = busio.I2C(board.SCL, board.SDA)
 ss = Seesaw(i2c_bus, addr=0x36)
 
+
 def read_sensor():
-    """Liest periodisch den Sensor aus und speichert die Werte in sensor_data."""
+    """Liest periodisch den Sensor aus und sendet die Daten per WebSocket."""
     while True:
         try:
             moisture = ss.moisture_read()
-        except Exception as e:
+        except Exception:
             moisture = None
 
         try:
-            # Liest die Temperatur (in °C), sofern unterstützt
             temperature = ss.get_temp()
-        except Exception as e:
+        except Exception:
             temperature = None
 
-        sensor_data["moisture"] = moisture
-        sensor_data["temperature"] = temperature
-        sensor_data["timestamp"] = time.strftime("%Y-%m-%d %H:%M:%S")
-        time.sleep(5)  # alle 5 Sekunden aktualisieren
+        sensor_data = {
+            "moisture": moisture,
+            "temperature": temperature,
+            "timestamp": time.strftime("%Y-%m-%d %H:%M:%S"),
+        }
 
-# Starte einen Hintergrundthread, um den Sensor auszulesen
+        # Senden der aktuellen Sensordaten an alle verbundenen Clients
+        socketio.emit("sensor_update", sensor_data)
+        time.sleep(5)  # Alle 5 Sekunden aktualisieren
+
+
+# Starte einen Hintergrundthread für das kontinuierliche Auslesen des Sensors
 sensor_thread = threading.Thread(target=read_sensor, daemon=True)
 sensor_thread.start()
 
-@app.route('/')
+
+@app.route("/")
 def home():
+    """Rendert die HTML-Seite mit WebSocket-Unterstützung."""
     html = """
     <html>
       <head>
         <title>Soil Sensor Data</title>
+        <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.5.4/socket.io.js"></script>
+        <script>
+          var socket = io();
+          socket.on('sensor_update', function(data) {
+            document.getElementById('moisture').innerText = data.moisture;
+            document.getElementById('temperature').innerText = data.temperature;
+            document.getElementById('timestamp').innerText = data.timestamp;
+          });
+        </script>
       </head>
       <body>
-        <h1>Soil Sensor Data</h1>
+        <h1>Soil Sensor Data (Live)</h1>
         <ul>
-          <li>Feuchtigkeit: {{ moisture }}</li>
-          <li>Temperatur: {{ temperature }}</li>
-          <li>Messzeitpunkt: {{ timestamp }}</li>
+          <li>Feuchtigkeit: <span id="moisture">Laden...</span></li>
+          <li>Temperatur: <span id="temperature">Laden...</span></li>
+          <li>Messzeitpunkt: <span id="timestamp">Laden...</span></li>
         </ul>
       </body>
     </html>
     """
-    return render_template_string(
-        html,
-        moisture=sensor_data["moisture"],
-        temperature=sensor_data["temperature"],
-        timestamp=sensor_data["timestamp"]
-    )
+    return render_template_string(html)
+
 
 if __name__ == "__main__":
-    # Starte den Server auf Port 80, sodass er im Netzwerk unter der IP des Pi erreichbar ist
-    app.run(host='0.0.0.0', port=5000, debug=True)
+    # Flask-App mit WebSockets starten
+    socketio.run(app, host="0.0.0.0", port=5000, debug=True)
