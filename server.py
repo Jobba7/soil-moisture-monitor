@@ -11,8 +11,6 @@ app = Flask(__name__)
 socketio = SocketIO(app, cors_allowed_origins="*")
 
 # Update interval for reading sensor data (in seconds)
-# This is the time between each read of the sensor data and database update.
-# It is set to 1 hour (3600 seconds) for this example, but can be adjusted as needed.
 UPDATE_INTERVAL = 3600  # seconds
 
 # SQLite database file
@@ -83,7 +81,24 @@ def home():
     Renders the HTML page with WebSocket support and a Chart.js graph.
     The page will display live sensor updates along with all data from the last 30 days.
     """
-    html = """
+    # Fetch the most recent sensor data for initial display
+    conn = sqlite3.connect(DB_FILE)
+    cursor = conn.cursor()
+    cursor.execute("SELECT * FROM sensor_data ORDER BY timestamp DESC LIMIT 1")
+    latest_data = cursor.fetchone()
+    conn.close()
+
+    if latest_data:
+        moisture_raw = latest_data[1]
+        moisture_percent = latest_data[2]
+        temperature = latest_data[3]
+        timestamp = latest_data[4]
+        min_moisture = latest_data[5]
+        max_moisture = latest_data[6]
+    else:
+        moisture_raw = moisture_percent = temperature = timestamp = min_moisture = max_moisture = "Keine Daten"
+
+    html = f"""
     <html>
       <head>
         <title>Soil Sensor Data</title>
@@ -93,68 +108,68 @@ def home():
       <body>
         <h1>Soil Sensor Data (Live)</h1>
         <ul>
-          <li>Feuchtigkeit: <span id="moisture">Laden...</span></li>
-          <li>Temperatur: <span id="temperature">Laden...</span></li>
-          <li>Messzeitpunkt: <span id="timestamp">Laden...</span></li>
-          <li>Minimale Feuchtigkeit: <span id="min_moisture">Laden...</span></li>
-          <li>Maximale Feuchtigkeit: <span id="max_moisture">Laden...</span></li>
+          <li>Feuchtigkeit: <span id="moisture">{moisture_raw} ({moisture_percent}%)</span></li>
+          <li>Temperatur: <span id="temperature">{temperature} °C</span></li>
+          <li>Messzeitpunkt: <span id="timestamp">{timestamp}</span></li>
+          <li>Minimale Feuchtigkeit: <span id="min_moisture">{min_moisture}</span></li>
+          <li>Maximale Feuchtigkeit: <span id="max_moisture">{max_moisture}</span></li>
         </ul>
         <canvas id="moistureChart" width="800" height="400"></canvas>
 
         <script>
-          window.onload = function () {
+          window.onload = function () {{
             var socket = io();
             var moistureData = [];
             var timeLabels = [];
 
             // Create chart with historical data (x-axis as category)
             var ctx = document.getElementById('moistureChart').getContext('2d');
-            var chart = new Chart(ctx, {
+            var chart = new Chart(ctx, {{
               type: 'line',
-              data: {
+              data: {{
                 labels: timeLabels,
-                datasets: [{
+                datasets: [{{
                   label: 'Moisture (%)',
                   data: moistureData,
                   borderColor: 'rgba(75, 192, 192, 1)',
                   backgroundColor: 'rgba(75, 192, 192, 0.2)',
                   borderWidth: 1
-                }]
-              },
-              options: {
+                }}]
+              }},
+              options: {{
                 responsive: true,
-                scales: {
-                  x: {
-                    title: {
+                scales: {{
+                  x: {{
+                    title: {{
                       display: true,
                       text: 'Timestamp'
-                    }
-                  },
-                  y: {
+                    }}
+                  }},
+                  y: {{
                     min: 0,
                     max: 100,
-                    title: {
+                    title: {{
                       display: true,
                       text: 'Moisture (%)'
-                    }
-                  }
-                }
-              }
-            });
+                    }}
+                  }}
+                }}
+              }}
+            }});
 
             // Fetch historical data for the last 30 days
             fetch('/historical_data')
               .then(response => response.json())
-              .then(data => {
+              .then(data => {{
                 // Data arrays come sorted by timestamp ascending
                 timeLabels.push(...data.timestamps);
                 moistureData.push(...data.moisture_percent);
                 chart.update();
-              })
+              }})
               .catch(error => console.error("Error fetching historical data:", error));
 
             // Listen for live sensor updates via WebSocket
-            socket.on('sensor_update', function (data) {
+            socket.on('sensor_update', function (data) {{
               console.log('Received live update:', data);
               // Update HTML elements
               document.getElementById('moisture').innerText = data.moisture_raw + " (" + data.moisture_percent + "%)";
@@ -169,13 +184,13 @@ def home():
 
               // Optionally, remove old data outside the 30-day window
               // Here we simply keep the last 100 entries for performance.
-              if (moistureData.length > 100) {
+              if (moistureData.length > 100) {{
                 moistureData.shift();
                 timeLabels.shift();
-              }
+              }}
               chart.update();
-            });
-          };
+            }});
+          }};
         </script>
       </body>
     </html>
