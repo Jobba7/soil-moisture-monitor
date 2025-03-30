@@ -1,9 +1,10 @@
-from flask import Flask, render_template_string
-from flask_socketio import SocketIO
+import yaml
 import time
 import threading
 import board
 import busio
+from flask import Flask, render_template_string
+from flask_socketio import SocketIO
 from adafruit_seesaw.seesaw import Seesaw
 
 # Flask-Anwendung mit WebSocket-Unterstützung initialisieren
@@ -14,12 +15,41 @@ socketio = SocketIO(app, cors_allowed_origins="*")
 i2c_bus = busio.I2C(board.SCL, board.SDA)
 ss = Seesaw(i2c_bus, addr=0x36)
 
+# Standardwerte für Min-/Max-Feuchtigkeit (falls config.yml fehlt)
+DEFAULT_MIN_MOISTURE = 200
+DEFAULT_MAX_MOISTURE = 800
+
+
+def load_config():
+    """Lädt die Konfigurationswerte aus der Datei config.yml."""
+    try:
+        with open("config.yml", "r") as file:
+            config = yaml.safe_load(file)
+            return config["sensor"].get("min_moisture", DEFAULT_MIN_MOISTURE), config["sensor"].get(
+                "max_moisture", DEFAULT_MAX_MOISTURE
+            )
+    except (FileNotFoundError, KeyError):
+        print("⚠️  Warnung: config.yml nicht gefunden oder fehlerhaft. Standardwerte werden verwendet.")
+        return DEFAULT_MIN_MOISTURE, DEFAULT_MAX_MOISTURE
+
+
+# Min-/Max-Werte aus der Config-Datei laden
+MIN_MOISTURE, MAX_MOISTURE = load_config()
+
+
+def normalize_moisture(value):
+    """Skaliert den Feuchtigkeitswert auf eine Skala von 0-100%."""
+    if value is None:
+        return None
+    return max(0, min(100, int((value - MIN_MOISTURE) / (MAX_MOISTURE - MIN_MOISTURE) * 100)))
+
 
 def read_sensor():
     """Liest periodisch den Sensor aus und sendet die Daten per WebSocket."""
     while True:
         try:
-            moisture = ss.moisture_read()
+            raw_moisture = ss.moisture_read()
+            moisture = normalize_moisture(raw_moisture)
         except Exception:
             moisture = None
 
@@ -55,8 +85,8 @@ def home():
         <script>
           var socket = io();
           socket.on('sensor_update', function(data) {
-            document.getElementById('moisture').innerText = data.moisture;
-            document.getElementById('temperature').innerText = data.temperature;
+            document.getElementById('moisture').innerText = data.moisture + " %";
+            document.getElementById('temperature').innerText = data.temperature + " °C";
             document.getElementById('timestamp').innerText = data.timestamp;
           });
         </script>

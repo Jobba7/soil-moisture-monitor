@@ -2,6 +2,8 @@
 
 Dieses Projekt liest Sensordaten (Bodenfeuchtigkeit & Temperatur) von einem **Adafruit Seesaw**-Sensor über I²C aus und zeigt die Daten live auf einer Webseite mit **WebSockets** an.
 
+- Gespeicherte Min/Max-Werte: Min=320, Max=820
+
 ## Voraussetzungen
 
 - **Raspberry Pi** oder ein anderes Gerät mit I²C-Unterstützung

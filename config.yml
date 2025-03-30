@@ -1,0 +1,3 @@
+sensor:
+  min_moisture: 320  # Kalibrierter Minimalwert
+  max_moisture: 820  # Kalibrierter Maximalwert
