@@ -1,59 +1,67 @@
+import sys
 import yaml
 import time
 import threading
 import board
 import busio
+from loguru import logger
 from flask import Flask, render_template_string
 from flask_socketio import SocketIO
 from adafruit_seesaw.seesaw import Seesaw
 
-# Flask-Anwendung mit WebSocket-Unterstützung initialisieren
+# Flask application with WebSocket support
 app = Flask(__name__)
 socketio = SocketIO(app, cors_allowed_origins="*")
 
-# I²C-Bus und Sensor initialisieren (Standardadresse 0x36)
+# Initialize I²C bus and sensor (default address 0x36)
 i2c_bus = busio.I2C(board.SCL, board.SDA)
 ss = Seesaw(i2c_bus, addr=0x36)
 
-# Standardwerte für Min-/Max-Feuchtigkeit (falls config.yml fehlt)
+# Default min/max values (used if config.yml is missing)
 DEFAULT_MIN_MOISTURE = 200
 DEFAULT_MAX_MOISTURE = 800
+CONFIG_FILE = "config.yml"
+
+# Configure logging with loguru
+logger.add("sensor.log", rotation="1 MB", retention="7 days", level="INFO")
+logger.add(sys.stderr, level="DEBUG")
 
 
 def load_config():
-    """Lädt die Konfigurationswerte aus der Datei config.yml oder setzt Standardwerte."""
+    """Loads sensor configuration (min/max moisture) from config.yml."""
     try:
-        with open("config.yml", "r") as file:
+        with open(CONFIG_FILE, "r") as file:
             config = yaml.safe_load(file)
-            return config["sensor"].get("min_moisture", DEFAULT_MIN_MOISTURE), config["sensor"].get(
-                "max_moisture", DEFAULT_MAX_MOISTURE
-            )
-    except (FileNotFoundError, KeyError):
-        print("⚠️  Warnung: config.yml nicht gefunden oder fehlerhaft. Standardwerte werden verwendet.")
+            min_moisture = config["sensor"].get("min_moisture", DEFAULT_MIN_MOISTURE)
+            max_moisture = config["sensor"].get("max_moisture", DEFAULT_MAX_MOISTURE)
+            logger.info(f"Config loaded: min_moisture={min_moisture}, max_moisture={max_moisture}")
+            return min_moisture, max_moisture
+    except (FileNotFoundError, KeyError) as e:
+        logger.warning(f"Could not load config.yml: {e}. Using default values.")
         return DEFAULT_MIN_MOISTURE, DEFAULT_MAX_MOISTURE
 
 
 def save_config(min_moisture, max_moisture):
-    """Speichert die aktuellen Min-/Max-Werte in der config.yml."""
+    """Saves updated min/max moisture values to config.yml."""
     config_data = {"sensor": {"min_moisture": min_moisture, "max_moisture": max_moisture}}
-    with open("config.yml", "w") as file:
+    with open(CONFIG_FILE, "w") as file:
         yaml.safe_dump(config_data, file)
-    print(f"✅ Neue Werte gespeichert: min={min_moisture}, max={max_moisture}")
+    logger.info(f"New config saved: min_moisture={min_moisture}, max_moisture={max_moisture}")
 
 
-# Min-/Max-Werte aus der Config-Datei laden
+# Load min/max values from config
 MIN_MOISTURE, MAX_MOISTURE = load_config()
 
 
 def normalize_moisture(value):
-    """Skaliert den Feuchtigkeitswert auf eine Skala von 0-100%."""
+    """Scales raw moisture value to a percentage (0-100%)."""
     if value is None:
         return None
     return max(0, min(100, int((value - MIN_MOISTURE) / (MAX_MOISTURE - MIN_MOISTURE) * 100)))
 
 
 def read_sensor():
-    """Liest periodisch den Sensor aus, aktualisiert Min-/Max-Werte und sendet die Daten per WebSocket."""
+    """Continuously reads sensor values, updates min/max moisture if needed, and sends data via WebSocket."""
     global MIN_MOISTURE, MAX_MOISTURE
 
     while True:
@@ -61,7 +69,7 @@ def read_sensor():
             raw_moisture = ss.moisture_read()
             moisture_percent = normalize_moisture(raw_moisture)
 
-            # Prüfen, ob neuer Min-/Max-Wert auftritt
+            # Update min/max values if new extremes are detected
             updated = False
             if raw_moisture < MIN_MOISTURE:
                 MIN_MOISTURE = raw_moisture
@@ -70,11 +78,13 @@ def read_sensor():
                 MAX_MOISTURE = raw_moisture
                 updated = True
 
-            # Falls sich die Min-/Max-Werte geändert haben, speichern
             if updated:
                 save_config(MIN_MOISTURE, MAX_MOISTURE)
 
-        except Exception:
+            logger.info(f"Sensor Read: moisture={raw_moisture} ({moisture_percent}%), temp={ss.get_temp()}°C")
+
+        except Exception as e:
+            logger.error(f"Sensor read failed: {e}")
             raw_moisture = None
             moisture_percent = None
 
@@ -92,19 +102,19 @@ def read_sensor():
             "max_moisture": MAX_MOISTURE,
         }
 
-        # Senden der aktuellen Sensordaten an alle verbundenen Clients
+        # Send data to WebSocket clients
         socketio.emit("sensor_update", sensor_data)
-        time.sleep(5)  # Alle 5 Sekunden aktualisieren
+        time.sleep(5)  # Update every 5 seconds
 
 
-# Starte einen Hintergrundthread für das kontinuierliche Auslesen des Sensors
+# Start sensor reading in a background thread
 sensor_thread = threading.Thread(target=read_sensor, daemon=True)
 sensor_thread.start()
 
 
 @app.route("/")
 def home():
-    """Rendert die HTML-Seite mit WebSocket-Unterstützung."""
+    """Renders the HTML page with WebSocket support (German interface)."""
     html = """
     <html>
       <head>
@@ -137,5 +147,5 @@ def home():
 
 
 if __name__ == "__main__":
-    # Flask-App mit WebSockets starten
+    # Start the Flask app with WebSockets
     socketio.run(app, host="0.0.0.0", port=5000, debug=True)
