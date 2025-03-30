@@ -1,4 +1,4 @@
-# Flask WebSocket Sensor Projekt
+# Soil Moisture Monitor
 
 Dieses Projekt liest Sensordaten (Bodenfeuchtigkeit & Temperatur) von einem **Adafruit Seesaw**-Sensor über I²C aus und zeigt die Daten live auf einer Webseite mit **WebSockets** an.
 
@@ -12,20 +12,20 @@ Dieses Projekt liest Sensordaten (Bodenfeuchtigkeit & Temperatur) von einem **Ad
 
 ### 1. Repository klonen
 ```bash
-git clone https://github.com/dein-repo/flask-websocket-sensor.git
-cd flask-websocket-sensor
+git clone https://github.com/Jobba7/soil-moisture-monitor.git
+cd soil-moisture-monitor
 ```
 
 ### 2. Virtuelle Umgebung erstellen (empfohlen)
 ```bash
-python3 -m venv venv
+python -m venv venv
 source venv/bin/activate  # Für Windows: venv\Scripts\activate
 ```
 
 ### 3. Abhängigkeiten installieren
 Erstelle eine `requirements.txt`, falls sie nicht existiert:
 ```bash
-echo "flask\nflask-socketio\nadafruit-circuitpython-seesaw" > requirements.txt
+pip freeze > requirements.txt
 ```
 Dann installiere die Pakete:
 ```bash
@@ -34,7 +34,7 @@ pip install -r requirements.txt
 
 ### 4. Anwendung starten
 ```bash
-python app.py
+python server.py
 ```
 
 Die Anwendung läuft nun auf **http://<IP-Adresse>:5000** und zeigt die Sensordaten live an.
@@ -71,7 +71,3 @@ Falls der Sensor nicht erkannt wird, überprüfe die I²C-Verbindung mit:
 sudo i2cdetect -y 1
 ```
 Falls die Adresse `0x36` nicht angezeigt wird, prüfe die Kabelverbindungen.
-
----
-**Viel Erfolg mit deinem Projekt! 🚀**
-
