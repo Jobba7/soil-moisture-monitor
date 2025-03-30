@@ -3,6 +3,7 @@ import time
 from flask import Flask, render_template_string
 from flask_socketio import SocketIO
 from sensor import read_sensor
+from logger_config import logger
 
 # Flask application with WebSocket support
 app = Flask(__name__)
@@ -52,6 +53,7 @@ def home():
 
 
 if __name__ == "__main__":
+    logger.info("Starting Flask server...")
     # Start sensor reading in a background thread
     sensor_thread = threading.Thread(target=update_data, daemon=True)
     sensor_thread.start()
