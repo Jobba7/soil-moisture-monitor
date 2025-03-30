@@ -15,7 +15,7 @@ Dieses Projekt liest Sensordaten (Bodenfeuchtigkeit & Temperatur) von einem **Ad
 ### 1. Repository klonen
 ```bash
 git clone https://github.com/Jobba7/soil-moisture-monitor.git
-cd soil-moisture-monitor
+cd soil-moisture-monitor/website
 ```
 
 ### 2. Virtuelle Umgebung erstellen (empfohlen)
@@ -44,28 +44,47 @@ Die Anwendung läuft nun auf **http://<IP-Adresse>:5000** und zeigt die Sensorda
 ## Automatischer Start beim Booten
 Falls das Programm automatisch beim Hochfahren gestartet werden soll, kann es als **Systemd-Service** eingerichtet werden.
 
-Erstelle die Datei `/etc/systemd/system/flask_sensor.service` mit folgendem Inhalt:
+1. **Service-Datei erstellen**
+
+Erstelle die Datei `/etc/systemd/system/soil_moisture_monitor.service` mit folgendem Inhalt:
 ```ini
 [Unit]
-Description=Flask WebSocket Sensor Service
+Description=Soil Moisture Monitor WebSocket Service
 After=network.target
 
 [Service]
 User=pi
-WorkingDirectory=/home/pi/flask-websocket-sensor
-ExecStart=/home/pi/flask-websocket-sensor/venv/bin/python /home/pi/flask-websocket-sensor/app.py
+WorkingDirectory=/home/pi/website
+ExecStart=/home/pi/website/venv/bin/python /home/pi/website/server.py
 Restart=always
+Environment=PYTHONUNBUFFERED=1
 
 [Install]
 WantedBy=multi-user.target
 ```
 
-Dann aktiviere den Service:
+2. **Systemd-Service aktivieren und starten**
+
+Aktualisiere den Systemd-Daemon und aktiviere den Service:
 ```bash
 sudo systemctl daemon-reload
-sudo systemctl enable flask_sensor
-sudo systemctl start flask_sensor
+sudo systemctl enable soil_moisture_monitor
+sudo systemctl start soil_moisture_monitor
 ```
+
+Nun wird das Projekt automatisch im Hintergrund beim Booten gestartet.
+
+3. **Überprüfen des Service-Status**
+   Um sicherzustellen, dass der Service läuft, kannst du den Status mit folgendem Befehl überprüfen:
+   ```bash
+   sudo systemctl status soil_moisture_monitor
+   ```
+
+4. **Service stoppen**
+   Falls du den Service anhalten möchtest, verwende:
+   ```bash
+   sudo systemctl stop soil_moisture_monitor
+   ```
 
 ## Fehlerbehebung
 Falls der Sensor nicht erkannt wird, überprüfe die I²C-Verbindung mit:
