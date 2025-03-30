@@ -1,7 +1,7 @@
 import threading
 import time
 import sqlite3
-from flask import Flask, render_template_string
+from flask import Flask, render_template_string, jsonify
 from flask_socketio import SocketIO
 from sensor import read_sensor
 from logger_config import logger
@@ -74,20 +74,61 @@ def update_data():
 
 @app.route("/")
 def home():
-    """Renders the HTML page with WebSocket support (German interface)."""
+    """Renders the HTML page with WebSocket support and chart (German interface)."""
     html = """
     <html>
       <head>
         <title>Soil Sensor Data</title>
         <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.5.4/socket.io.js"></script>
+        <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
         <script>
           var socket = io();
+          var moistureData = [];
+          var timeLabels = [];
+
+          // Function to update the chart with new data
           socket.on('sensor_update', function(data) {
-            document.getElementById('moisture').innerText = data.moisture_raw + " (" + data.moisture_percent + "%)";
-            document.getElementById('temperature').innerText = data.temperature + " °C";
-            document.getElementById('timestamp').innerText = data.timestamp;
-            document.getElementById('min_moisture').innerText = data.min_moisture;
-            document.getElementById('max_moisture').innerText = data.max_moisture;
+            // Add new data to arrays
+            moistureData.push(data.moisture_percent);
+            timeLabels.push(data.timestamp);
+
+            // Keep the last 50 entries for the graph
+            if (moistureData.length > 50) {
+              moistureData.shift();
+              timeLabels.shift();
+            }
+
+            // Update the chart
+            chart.update();
+          });
+
+          // Create chart
+          var ctx = document.getElementById('moistureChart').getContext('2d');
+          var chart = new Chart(ctx, {
+            type: 'line',
+            data: {
+              labels: timeLabels,
+              datasets: [{
+                label: 'Moisture (%)',
+                data: moistureData,
+                borderColor: 'rgba(75, 192, 192, 1)',
+                backgroundColor: 'rgba(75, 192, 192, 0.2)',
+                borderWidth: 1
+              }]
+            },
+            options: {
+              responsive: true,
+              scales: {
+                x: {
+                  type: 'linear',
+                  position: 'bottom'
+                },
+                y: {
+                  min: 0,
+                  max: 100
+                }
+              }
+            }
           });
         </script>
       </head>
@@ -100,10 +141,27 @@ def home():
           <li>Minimale Feuchtigkeit: <span id="min_moisture">Laden...</span></li>
           <li>Maximale Feuchtigkeit: <span id="max_moisture">Laden...</span></li>
         </ul>
+        <canvas id="moistureChart" width="400" height="200"></canvas>
       </body>
     </html>
     """
     return render_template_string(html)
+
+
+@app.route("/historical_data")
+def historical_data():
+    """Fetches historical data from the database and sends it as JSON."""
+    conn = sqlite3.connect(DB_FILE)
+    cursor = conn.cursor()
+    cursor.execute("SELECT timestamp, moisture_percent FROM sensor_data ORDER BY id DESC LIMIT 50")
+    data = cursor.fetchall()
+    conn.close()
+
+    # Prepare data for the chart
+    timestamps = [entry[0] for entry in data]
+    moisture_percent = [entry[1] for entry in data]
+
+    return jsonify({"timestamps": timestamps, "moisture_percent": moisture_percent})
 
 
 if __name__ == "__main__":
