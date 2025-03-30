@@ -21,7 +21,7 @@ DEFAULT_MAX_MOISTURE = 800
 
 
 def load_config():
-    """Lädt die Konfigurationswerte aus der Datei config.yml."""
+    """Lädt die Konfigurationswerte aus der Datei config.yml oder setzt Standardwerte."""
     try:
         with open("config.yml", "r") as file:
             config = yaml.safe_load(file)
@@ -31,6 +31,14 @@ def load_config():
     except (FileNotFoundError, KeyError):
         print("⚠️  Warnung: config.yml nicht gefunden oder fehlerhaft. Standardwerte werden verwendet.")
         return DEFAULT_MIN_MOISTURE, DEFAULT_MAX_MOISTURE
+
+
+def save_config(min_moisture, max_moisture):
+    """Speichert die aktuellen Min-/Max-Werte in der config.yml."""
+    config_data = {"sensor": {"min_moisture": min_moisture, "max_moisture": max_moisture}}
+    with open("config.yml", "w") as file:
+        yaml.safe_dump(config_data, file)
+    print(f"✅ Neue Werte gespeichert: min={min_moisture}, max={max_moisture}")
 
 
 # Min-/Max-Werte aus der Config-Datei laden
@@ -45,11 +53,27 @@ def normalize_moisture(value):
 
 
 def read_sensor():
-    """Liest periodisch den Sensor aus und sendet die Daten per WebSocket."""
+    """Liest periodisch den Sensor aus, aktualisiert Min-/Max-Werte und sendet die Daten per WebSocket."""
+    global MIN_MOISTURE, MAX_MOISTURE
+
     while True:
         try:
             raw_moisture = ss.moisture_read()
             moisture_percent = normalize_moisture(raw_moisture)
+
+            # Prüfen, ob neuer Min-/Max-Wert auftritt
+            updated = False
+            if raw_moisture < MIN_MOISTURE:
+                MIN_MOISTURE = raw_moisture
+                updated = True
+            if raw_moisture > MAX_MOISTURE:
+                MAX_MOISTURE = raw_moisture
+                updated = True
+
+            # Falls sich die Min-/Max-Werte geändert haben, speichern
+            if updated:
+                save_config(MIN_MOISTURE, MAX_MOISTURE)
+
         except Exception:
             raw_moisture = None
             moisture_percent = None
