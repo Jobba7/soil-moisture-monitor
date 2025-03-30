@@ -1,3 +1,4 @@
+import sys
 import yaml
 import time
 import threading
@@ -23,6 +24,7 @@ CONFIG_FILE = "config.yml"
 
 # Configure logging with loguru
 logger.remove()
+logger.add(sys.stderr, level="DEBUG")
 logger.add("sensor.log", rotation="1 MB", retention="7 days", level="INFO")
 
 
