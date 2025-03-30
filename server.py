@@ -81,56 +81,6 @@ def home():
         <title>Soil Sensor Data</title>
         <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.5.4/socket.io.js"></script>
         <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-        <script>
-          var socket = io();
-          var moistureData = [];
-          var timeLabels = [];
-
-          // Function to update the chart with new data
-          socket.on('sensor_update', function(data) {
-            // Add new data to arrays
-            moistureData.push(data.moisture_percent);
-            timeLabels.push(data.timestamp);
-
-            // Keep the last 50 entries for the graph
-            if (moistureData.length > 50) {
-              moistureData.shift();
-              timeLabels.shift();
-            }
-
-            // Update the chart
-            chart.update();
-          });
-
-          // Create chart
-          var ctx = document.getElementById('moistureChart').getContext('2d');
-          var chart = new Chart(ctx, {
-            type: 'line',
-            data: {
-              labels: timeLabels,
-              datasets: [{
-                label: 'Moisture (%)',
-                data: moistureData,
-                borderColor: 'rgba(75, 192, 192, 1)',
-                backgroundColor: 'rgba(75, 192, 192, 0.2)',
-                borderWidth: 1
-              }]
-            },
-            options: {
-              responsive: true,
-              scales: {
-                x: {
-                  type: 'linear',
-                  position: 'bottom'
-                },
-                y: {
-                  min: 0,
-                  max: 100
-                }
-              }
-            }
-          });
-        </script>
       </head>
       <body>
         <h1>Soil Sensor Data (Live)</h1>
@@ -142,6 +92,59 @@ def home():
           <li>Maximale Feuchtigkeit: <span id="max_moisture">Laden...</span></li>
         </ul>
         <canvas id="moistureChart" width="400" height="200"></canvas>
+
+        <script>
+          window.onload = function () {
+            var socket = io();
+            var moistureData = [];
+            var timeLabels = [];
+
+            // Function to update the chart with new data
+            socket.on('sensor_update', function (data) {
+              // Add new data to arrays
+              moistureData.push(data.moisture_percent);
+              timeLabels.push(data.timestamp);
+
+              // Keep the last 50 entries for the graph
+              if (moistureData.length > 50) {
+                moistureData.shift();
+                timeLabels.shift();
+              }
+
+              // Update the chart
+              chart.update();
+            });
+
+            // Create chart
+            var ctx = document.getElementById('moistureChart').getContext('2d');
+            var chart = new Chart(ctx, {
+              type: 'line',
+              data: {
+                labels: timeLabels,
+                datasets: [{
+                  label: 'Moisture (%)',
+                  data: moistureData,
+                  borderColor: 'rgba(75, 192, 192, 1)',
+                  backgroundColor: 'rgba(75, 192, 192, 0.2)',
+                  borderWidth: 1
+                }]
+              },
+              options: {
+                responsive: true,
+                scales: {
+                  x: {
+                    type: 'linear',
+                    position: 'bottom'
+                  },
+                  y: {
+                    min: 0,
+                    max: 100
+                  }
+                }
+              }
+            });
+          }
+        </script>
       </body>
     </html>
     """
