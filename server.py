@@ -1,5 +1,6 @@
 import threading
 import time
+import sqlite3
 from flask import Flask, render_template_string
 from flask_socketio import SocketIO
 from sensor import read_sensor
@@ -9,12 +10,65 @@ from logger_config import logger
 app = Flask(__name__)
 socketio = SocketIO(app, cors_allowed_origins="*")
 
+# SQLite database setup
+DB_FILE = "sensor_data.db"
+
+
+def create_db():
+    """Creates the SQLite database and table if not already present."""
+    conn = sqlite3.connect(DB_FILE)
+    cursor = conn.cursor()
+    cursor.execute(
+        """
+        CREATE TABLE IF NOT EXISTS sensor_data (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            moisture_raw INTEGER,
+            moisture_percent INTEGER,
+            temperature REAL,
+            timestamp TEXT,
+            min_moisture INTEGER,
+            max_moisture INTEGER
+        )
+    """
+    )
+    conn.commit()
+    conn.close()
+
+
+def insert_sensor_data(sensor_data):
+    """Inserts sensor data into the database."""
+    conn = sqlite3.connect(DB_FILE)
+    cursor = conn.cursor()
+    cursor.execute(
+        """
+        INSERT INTO sensor_data (
+            moisture_raw, moisture_percent, temperature, timestamp, min_moisture, max_moisture
+        ) VALUES (?, ?, ?, ?, ?, ?)
+    """,
+        (
+            sensor_data["moisture_raw"],
+            sensor_data["moisture_percent"],
+            sensor_data["temperature"],
+            sensor_data["timestamp"],
+            sensor_data["min_moisture"],
+            sensor_data["max_moisture"],
+        ),
+    )
+    conn.commit()
+    conn.close()
+
 
 def update_data():
-    """Continuously reads sensor values, updates min/max moisture if needed, and sends data via WebSocket."""
+    """Continuously reads sensor values, stores them in the database, and sends data via WebSocket."""
     while True:
         sensor_data = read_sensor()
+
+        # Insert data into the database
+        insert_sensor_data(sensor_data)
+
+        # Send data via WebSocket
         socketio.emit("sensor_update", sensor_data)
+
         time.sleep(5)  # Update every 5 seconds
 
 
@@ -53,7 +107,11 @@ def home():
 
 
 if __name__ == "__main__":
+    # Initialize the database
+    create_db()
+
     logger.info("Starting App...")
+
     # Start sensor reading in a background thread
     sensor_thread = threading.Thread(target=update_data, daemon=True)
     sensor_thread.start()
