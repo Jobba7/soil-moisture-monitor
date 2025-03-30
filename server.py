@@ -49,9 +49,10 @@ def read_sensor():
     while True:
         try:
             raw_moisture = ss.moisture_read()
-            moisture = normalize_moisture(raw_moisture)
+            moisture_percent = normalize_moisture(raw_moisture)
         except Exception:
-            moisture = None
+            raw_moisture = None
+            moisture_percent = None
 
         try:
             temperature = ss.get_temp()
@@ -59,9 +60,12 @@ def read_sensor():
             temperature = None
 
         sensor_data = {
-            "moisture": moisture,
+            "moisture_raw": raw_moisture,
+            "moisture_percent": moisture_percent,
             "temperature": temperature,
             "timestamp": time.strftime("%Y-%m-%d %H:%M:%S"),
+            "min_moisture": MIN_MOISTURE,
+            "max_moisture": MAX_MOISTURE,
         }
 
         # Senden der aktuellen Sensordaten an alle verbundenen Clients
@@ -85,9 +89,11 @@ def home():
         <script>
           var socket = io();
           socket.on('sensor_update', function(data) {
-            document.getElementById('moisture').innerText = data.moisture + " %";
+            document.getElementById('moisture').innerText = data.moisture_raw + " (" + data.moisture_percent + "%)";
             document.getElementById('temperature').innerText = data.temperature + " °C";
             document.getElementById('timestamp').innerText = data.timestamp;
+            document.getElementById('min_moisture').innerText = data.min_moisture;
+            document.getElementById('max_moisture').innerText = data.max_moisture;
           });
         </script>
       </head>
@@ -97,6 +103,8 @@ def home():
           <li>Feuchtigkeit: <span id="moisture">Laden...</span></li>
           <li>Temperatur: <span id="temperature">Laden...</span></li>
           <li>Messzeitpunkt: <span id="timestamp">Laden...</span></li>
+          <li>Minimale Feuchtigkeit: <span id="min_moisture">Laden...</span></li>
+          <li>Maximale Feuchtigkeit: <span id="max_moisture">Laden...</span></li>
         </ul>
       </body>
     </html>
