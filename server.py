@@ -53,10 +53,10 @@ def home():
 
 
 if __name__ == "__main__":
-    logger.info("Starting Flask server...")
+    logger.info("Starting App...")
     # Start sensor reading in a background thread
     sensor_thread = threading.Thread(target=update_data, daemon=True)
     sensor_thread.start()
 
     # Start the Flask app with WebSockets
-    socketio.run(app, host="0.0.0.0", port=5000, debug=True)
+    socketio.run(app, host="0.0.0.0", port=5000, debug=False, use_reloader=False)
