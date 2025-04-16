@@ -11,7 +11,7 @@ app = Flask(__name__)
 socketio = SocketIO(app, cors_allowed_origins="*")
 
 # Update interval for reading sensor data (in seconds)
-UPDATE_INTERVAL = 3600  # seconds
+UPDATE_INTERVAL = 1  # seconds
 
 # SQLite database file
 DB_FILE = "sensor_data.db"
